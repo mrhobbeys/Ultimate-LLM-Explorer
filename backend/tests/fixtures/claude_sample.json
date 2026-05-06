@@ -1,0 +1,22 @@
+[
+  {
+    "uuid": "claude-conv-1",
+    "name": "Rust lifetimes",
+    "created_at": "2024-02-15T10:00:00Z",
+    "updated_at": "2024-02-15T10:05:00Z",
+    "chat_messages": [
+      {
+        "uuid": "m-1",
+        "sender": "human",
+        "created_at": "2024-02-15T10:00:30Z",
+        "content": [{"type": "text", "text": "Explain Rust lifetimes simply."}]
+      },
+      {
+        "uuid": "m-2",
+        "sender": "assistant",
+        "created_at": "2024-02-15T10:00:45Z",
+        "text": "Lifetimes are compile-time annotations that track how long references are valid."
+      }
+    ]
+  }
+]

@@ -1,0 +1,48 @@
+[
+  {
+    "id": "conv-abc",
+    "title": "Python decorators",
+    "create_time": 1700000000.0,
+    "update_time": 1700000200.0,
+    "current_node": "n3",
+    "mapping": {
+      "n0": {"id": "n0", "parent": null, "children": ["n1"], "message": null},
+      "n1": {
+        "id": "n1",
+        "parent": "n0",
+        "children": ["n2"],
+        "message": {
+          "id": "m1",
+          "author": {"role": "user"},
+          "create_time": 1700000010.0,
+          "content": {"content_type": "text", "parts": ["How do decorators work in Python?"]},
+          "metadata": {"model_slug": "gpt-4o"}
+        }
+      },
+      "n2": {
+        "id": "n2",
+        "parent": "n1",
+        "children": ["n3"],
+        "message": {
+          "id": "m2",
+          "author": {"role": "assistant"},
+          "create_time": 1700000020.0,
+          "content": {"content_type": "text", "parts": ["A decorator is a callable that wraps another callable..."]},
+          "metadata": {"model_slug": "gpt-4o"}
+        }
+      },
+      "n3": {
+        "id": "n3",
+        "parent": "n2",
+        "children": [],
+        "message": {
+          "id": "m3",
+          "author": {"role": "user"},
+          "create_time": 1700000100.0,
+          "content": {"content_type": "text", "parts": ["Can you show functools.wraps?"]},
+          "metadata": {"model_slug": "gpt-4o"}
+        }
+      }
+    }
+  }
+]

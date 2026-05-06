@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pytest*)",
+      "Bash(python -m pytest*)",
+      "Bash(PYTHONPATH=. python -m pytest*)",
+      "Bash(npm install*)",
+      "Bash(npm run*)",
+      "Bash(make*)",
+      "Bash(ruff check*)",
+      "Bash(mypy*)"
+    ]
+  }
+}
