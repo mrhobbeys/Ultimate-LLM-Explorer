@@ -8,6 +8,7 @@ import discord
 from discord.ext import commands
 
 from .analysis import TextAnalyzer
+from .bayes import BayesFilter
 from .config import Config
 from .db import Database
 from .llm import LLMClient
@@ -60,12 +61,14 @@ class PiBot(commands.Bot):
             wordlist_path=cfg.profanity_wordlist,
         )
         self.llm = LLMClient(cfg.llm, cache_size=cfg.moderation.verdict_cache_size)
+        self.bayes = BayesFilter(cfg.bayes, self.db)
         self.metrics = Metrics(self)
         self.webadmin = WebAdmin(self)
 
     async def setup_hook(self) -> None:
         await self.db.connect()
         await self.settings.load()
+        await self.bayes.load()
         await self.llm.start()
         if self.cfg.metrics.enabled:
             await self.metrics.start_http(self.cfg.metrics.host, self.cfg.metrics.port)

@@ -23,6 +23,7 @@ KNOWN_KEYS = {
     "mod.suspicion_high": "0-1 act-directly threshold",
     "mod.profanity_action": "delete | warn | timeout | log",
     "mod.llm_escalation": "true | false",
+    "bayes.threshold": "0-1 learned-filter delete threshold (default 0.92)",
     "spam.action": "delete | timeout | warn | log",
     "spam.max_messages": "int, messages per window",
     "spam.max_mentions": "int",

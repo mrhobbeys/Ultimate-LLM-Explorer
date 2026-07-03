@@ -125,6 +125,10 @@ class Metrics:
             "llm_failures": llm.failures,
             "llm_avg_latency_ms": round(llm.avg_latency * 1000, 1),
             "llm_breaker_open": int(llm.breaker_open),
+            "bayes_spam_msgs": self.bot.bayes.spam_msgs,
+            "bayes_ham_msgs": self.bot.bayes.ham_msgs,
+            "bayes_catches": self.bot.bayes.catches,
+            "bayes_ready": int(self.bot.bayes.ready),
         }
 
     def prometheus(self) -> str:

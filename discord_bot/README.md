@@ -39,6 +39,7 @@ The bot is designed around those constraints:
 |------|--------------|
 | **Spam protection** | Sliding-window rate limits, duplicate detection, mention/link/emoji/newline floods |
 | **Smart moderation** | Deterministic profanity (leet-normalized) → suspicion score → offboard LLM only for the ambiguous middle. The LLM's output never hits chat; it only informs delete/timeout/ban |
+| **Learned spam filter** | Old-school email-style Naive Bayes that learns what spam *feels like* on **your** server. Trained by verified outcomes only (LLM verdicts, your DM approvals/denials, `!mod trainspam`) — never by its own catches, so no feedback loop. The more it learns, the fewer LLM calls you pay for. Microseconds per message, even on a Pi 1 |
 | **DM approval** | In `approve` mode the bot DMs you *"ban so-and-so? Approve/Deny"* with buttons; decisions survive restarts |
 | **Remote DM console** | Admins run the whole server from DMs: list users, pull someone's recent messages, ban/kick/timeout/delete/purge — without opening the server |
 | **Raid & scam defense** | Join-velocity raid detection, new-account gating, phishing-link + nitro-scam filter, warn→mute→kick→ban ladder |
@@ -141,8 +142,9 @@ shows a live dashboard and `!bench` times the analyzer on the current hardware.
 **Everyone:** `help` · `ping` · `rank [@user]` · `leaderboard` · `rep @user` ·
 `search <flags>` · `searchhelp`
 
-**Staff:** `mod` · `mod mode` · `mod sensitivity` · `mod test` · `warn` ·
-`warnings` · `clearwarns` · `preset [name]`
+**Staff:** `mod` · `mod mode` · `mod sensitivity` · `mod test` ·
+`mod trainspam` / `trainham` · `mod filter` · `warn` · `warnings` ·
+`clearwarns` · `preset [name]`
 
 **Admin:** `setup` · `set <key> <value>` · `get [key]` · `keys` · `panic` ·
 `backup`

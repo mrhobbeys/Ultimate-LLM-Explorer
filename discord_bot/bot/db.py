@@ -93,7 +93,19 @@ CREATE TABLE IF NOT EXISTS pending_actions (
     reason      TEXT,
     severity    REAL,
     status      TEXT,          -- pending | approved | denied | expired
+    content     TEXT,          -- offending text, kept so verdicts can train bayes
     created_ts  REAL
+);
+
+CREATE TABLE IF NOT EXISTS bayes_tokens (
+    token TEXT PRIMARY KEY,
+    spam  INTEGER NOT NULL DEFAULT 0,
+    ham   INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS bayes_meta (
+    key   TEXT PRIMARY KEY,
+    value INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_pending_dm ON pending_actions(dm_message);
@@ -138,6 +150,16 @@ class Database:
         def _do() -> None:
             assert self._conn is not None
             self._conn.execute(sql, tuple(params))
+            self._conn.commit()
+
+        await self._run(_do)
+
+    async def executemany(self, sql: str, rows: Iterable[Iterable[Any]]) -> None:
+        rows = [tuple(r) for r in rows]
+
+        def _do() -> None:
+            assert self._conn is not None
+            self._conn.executemany(sql, rows)
             self._conn.commit()
 
         await self._run(_do)

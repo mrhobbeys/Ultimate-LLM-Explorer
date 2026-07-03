@@ -21,12 +21,16 @@ DM approvals are persisted, so a reboot doesn't drop a pending decision.
 
 from __future__ import annotations
 
+import random
 import time
 
 import discord
 from discord.ext import commands
 
 DESTRUCTIVE = {"kick", "ban"}
+# only *verified* signals may teach the bayes filter — never its own catches,
+# or it would reinforce its own mistakes (the classic feedback loop).
+BAYES_TRAINABLE = {"profanity", "scam", "llm", "approved", "manual"}
 
 
 def is_mod():
@@ -115,7 +119,23 @@ class Moderation(commands.Cog):
             )
             return
 
-        # 2/3. suspicion routing
+        # 2. learned spam filter (Naive Bayes) — trained by this server's own
+        # verified moderation history; costs microseconds.
+        bp = self.bot.bayes.score(message.content)
+        if bp is not None:
+            thr = self.bot.settings.get_float(
+                gid, "bayes.threshold", self.bot.cfg.bayes.spam_threshold
+            )
+            if bp >= thr:
+                self.bot.bayes.catches += 1
+                await self.enforce(
+                    message, kind="bayes", action="delete",
+                    reason=f"learned spam filter P={bp:.2f}", severity=bp,
+                )
+                return
+        force_llm = bp is not None and bp >= self.bot.cfg.bayes.escalate_threshold
+
+        # 3/4. suspicion routing
         low, high = self.slow(gid), self.shigh(gid)
         if shape.suspicion >= high:
             await self.enforce(
@@ -124,17 +144,33 @@ class Moderation(commands.Cog):
             )
             return
         if (
-            shape.suspicion >= low
+            (shape.suspicion >= low or force_llm)
             and self.cfg.llm_escalation_enabled
             and self.bot.settings.get_bool(gid, "mod.llm_escalation", self.cfg.llm_escalation_enabled)
             and len(message.content) >= self.cfg.min_escalation_len
         ):
             await self._escalate(message, shape)
+            return
+
+        # 5. quietly sample a few untouched messages as ham so the filter
+        # keeps a balanced picture of what normal chatter looks like.
+        if (
+            self.bot.cfg.bayes.enabled
+            and len(message.content) >= self.cfg.min_escalation_len
+            and random.random() < self.bot.cfg.bayes.auto_ham_rate
+            and self.bot.bayes.ham_msgs < self.bot.bayes.spam_msgs * 6 + 200
+        ):
+            await self.bot.bayes.train(message.content, is_spam=False)
 
     async def _escalate(self, message: discord.Message, shape) -> None:
         self.bot.metrics.escalations += 1
         verdict = await self.bot.llm.classify(message.content)
-        if not verdict.ok or not verdict.is_harmful:
+        if not verdict.ok:
+            return
+        if not verdict.is_harmful:
+            # LLM-verified clean — teach the bayes filter, so next time this
+            # kind of message never needs the LLM at all.
+            await self.bot.bayes.train(message.content, is_spam=False)
             return
         sev = verdict.severity
         if sev >= self.cfg.llm_ban_severity:
@@ -199,6 +235,8 @@ class Moderation(commands.Cog):
         await self._record(
             guild, member, message, kind, action if ok else f"{action}:failed", reason, severity
         )
+        if ok and kind in BAYES_TRAINABLE and message is not None and message.content:
+            await self.bot.bayes.train(message.content, is_spam=True)
         if isinstance(member, discord.Member):
             await self.bot.db.execute(
                 "UPDATE users SET infractions = infractions + 1 "
@@ -252,8 +290,8 @@ class Moderation(commands.Cog):
             await self.bot.db.execute(
                 "INSERT INTO pending_actions "
                 "(guild_id, target_id, channel_id, src_message, dm_message, action, "
-                " reason, severity, status, created_ts) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)",
+                " reason, severity, status, content, created_ts) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
                 (
                     guild.id,
                     member.id if member else None,
@@ -263,6 +301,7 @@ class Moderation(commands.Cog):
                     action,
                     reason,
                     severity,
+                    (message.content or "")[:1900] if message else "",
                     time.time(),
                 ),
             )
@@ -280,14 +319,20 @@ class Moderation(commands.Cog):
             "UPDATE pending_actions SET status=? WHERE id=?", (new_status, row["id"])
         )
         guild = self.bot.get_guild(row["guild_id"])
+        content = row["content"] or ""
         if approved and guild is not None:
             member = guild.get_member(row["target_id"]) if row["target_id"] else None
             message = None  # source message may be gone; delete is best-effort
             await self._apply(
                 guild, member, message, row["action"], row["reason"], row["severity"], "approved"
             )
+            if content:  # your verdict is the best training signal there is
+                await self.bot.bayes.train(content, is_spam=True)
             verdict_text = f"✅ {row['action']} executed."
         else:
+            if not approved and content:
+                # you said it was fine — correct the filter's false positive
+                await self.bot.bayes.train(content, is_spam=False)
             verdict_text = "🚫 Denied — no action taken." if not approved else "Guild unavailable."
         try:
             await interaction.response.edit_message(content=verdict_text, view=None)
@@ -337,11 +382,72 @@ class Moderation(commands.Cog):
     async def mod_test(self, ctx: commands.Context, *, text: str) -> None:
         """Dry-run the analyzer on some text and show the shape + suspicion."""
         s = self.bot.analyzer.analyze(text)
+        bp = self.bot.bayes.score(text)
         await ctx.send(
             f"suspicion=`{s.suspicion:.2f}` caps=`{s.caps_ratio:.2f}` "
             f"entropy=`{s.entropy:.2f}` profanity=`{s.profanity_hits or '—'}` "
-            f"sentiment=`{s.sentiment}`"
+            f"sentiment=`{s.sentiment}` bayes=`{f'{bp:.2f}' if bp is not None else 'untrained'}`"
         )
+
+    # -- learned filter: manual training + stats ---------------------------- #
+    async def _train_target(self, ctx: commands.Context, text: str, is_spam: bool) -> None:
+        """Train on pasted text, or on the message being replied to."""
+        if not text and ctx.message.reference:
+            try:
+                ref = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+                text = ref.content or ""
+            except discord.HTTPException:
+                text = ""
+        if not text.strip():
+            await ctx.send("Reply to a message or paste the text to train on.")
+            return
+        await self.bot.bayes.train(text, is_spam=is_spam)
+        label = "spam 🚮" if is_spam else "ham 👍"
+        b = self.bot.bayes
+        await ctx.send(
+            f"Learned as **{label}**. Corpus: {b.spam_msgs} spam / {b.ham_msgs} ham "
+            f"({'active' if b.ready else f'needs {max(0, b.cfg.min_spam - b.spam_msgs)} more spam, {max(0, b.cfg.min_ham - b.ham_msgs)} more ham'})."
+        )
+
+    @mod.command(name="trainspam")
+    @is_mod()
+    async def trainspam(self, ctx: commands.Context, *, text: str = "") -> None:
+        """Teach the learned filter: this is spam (reply to a message or paste text)."""
+        await self._train_target(ctx, text, is_spam=True)
+
+    @mod.command(name="trainham")
+    @is_mod()
+    async def trainham(self, ctx: commands.Context, *, text: str = "") -> None:
+        """Teach the learned filter: this is fine (fixes false positives)."""
+        await self._train_target(ctx, text, is_spam=False)
+
+    @mod.command(name="filter")
+    @is_mod()
+    async def filter_stats(self, ctx: commands.Context) -> None:
+        """Show what the learned spam filter knows."""
+        b = self.bot.bayes
+        embed = discord.Embed(title="🧠 Learned spam filter", color=discord.Color.purple())
+        embed.add_field(name="Status", value="active" if b.ready else "learning", inline=True)
+        embed.add_field(name="Corpus", value=f"{b.spam_msgs} spam / {b.ham_msgs} ham", inline=True)
+        embed.add_field(name="Vocabulary", value=str(b.vocab_size), inline=True)
+        embed.add_field(name="Catches", value=str(b.catches), inline=True)
+        embed.add_field(name="Trainings", value=str(b.trainings), inline=True)
+        thr = self.bot.settings.get_float(
+            ctx.guild.id if ctx.guild else None, "bayes.threshold", b.cfg.spam_threshold
+        )
+        embed.add_field(name="Threshold", value=f"{thr:.2f}", inline=True)
+        top = b.top_spam_tokens(8)
+        if top:
+            embed.add_field(
+                name="Top spam signals",
+                value=", ".join(f"`{t}`×{c}" for t, c in top),
+                inline=False,
+            )
+        embed.set_footer(
+            text=f"Train with {ctx.prefix}mod trainspam / trainham (reply or paste). "
+            f"Tune with {ctx.prefix}set bayes.threshold 0.xx"
+        )
+        await ctx.send(embed=embed)
 
 
 def _td(seconds: int):

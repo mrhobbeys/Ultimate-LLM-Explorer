@@ -162,6 +162,17 @@ class LoggingConfig:
 
 
 @dataclass
+class BayesConfig:
+    enabled: bool = True
+    spam_threshold: float = 0.92     # act (delete) at/above this P(spam)
+    escalate_threshold: float = 0.7  # force an LLM look at/above this
+    min_spam: int = 10               # don't classify until trained this much
+    min_ham: int = 10
+    auto_ham_rate: float = 0.02      # sample rate of clean messages as ham
+    vocab_cap: int = 30000           # prune singletons past this (RAM cap)
+
+
+@dataclass
 class MetricsConfig:
     enabled: bool = True
     host: str = "127.0.0.1"
@@ -233,6 +244,7 @@ class Config:
     raid: RaidConfig = field(default_factory=RaidConfig)
     webadmin: WebadminConfig = field(default_factory=WebadminConfig)
     mailer: MailerConfig = field(default_factory=MailerConfig)
+    bayes: BayesConfig = field(default_factory=BayesConfig)
 
     @classmethod
     def load(cls) -> "Config":
@@ -345,5 +357,14 @@ class Config:
                 to_addrs=[x for x in _get("MAIL_TO").replace(",", " ").split() if x],
                 notify_on_update=_get_bool("MAIL_NOTIFY_ON_UPDATE", True),
                 notify_on_start=_get_bool("MAIL_NOTIFY_ON_START", False),
+            ),
+            bayes=BayesConfig(
+                enabled=_get_bool("BAYES_ENABLED", True),
+                spam_threshold=_get_float("BAYES_SPAM_THRESHOLD", 0.92),
+                escalate_threshold=_get_float("BAYES_ESCALATE_THRESHOLD", 0.7),
+                min_spam=_get_int("BAYES_MIN_SPAM", 10),
+                min_ham=_get_int("BAYES_MIN_HAM", 10),
+                auto_ham_rate=_get_float("BAYES_AUTO_HAM_RATE", 0.02),
+                vocab_cap=_get_int("BAYES_VOCAB_CAP", 30000),
             ),
         )
