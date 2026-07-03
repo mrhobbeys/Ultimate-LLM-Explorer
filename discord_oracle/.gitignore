@@ -1,0 +1,11 @@
+# Per-player save worlds (SQLite). Never commit these.
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.env

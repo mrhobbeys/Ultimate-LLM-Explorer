@@ -1,0 +1,10 @@
+# Runtime dependency for the bot itself.
+discord.py>=2.3
+
+# Optional — only if you want LLM-enriched NPC dialogue via the Anthropic API.
+# The game runs fully without it. (Free local option: run Ollama instead and set
+# ORACLE_LLM_BACKEND=ollama — no package needed, it's called over HTTP.)
+# anthropic>=0.40
+
+# Dev/test only:
+#   pytest>=8.0
