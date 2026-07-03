@@ -1,0 +1,16 @@
+# secrets & runtime state — never commit
+.env
+.install-choices
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# stress harness output
+*.csv

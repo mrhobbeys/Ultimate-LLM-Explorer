@@ -1,0 +1,7 @@
+# Core dependencies — deliberately tiny so it installs (or compiles) even on a
+# Pi 1 / Zero (ARMv6). aiohttp ships WITH discord.py, so the metrics/web server
+# and the LLM HTTP client add nothing extra.
+discord.py>=2.3,<3
+# pure-python, no C extensions — safe on ARMv6. Only used to read .env; the bot
+# has a built-in fallback parser if it's ever missing.
+python-dotenv>=1.0

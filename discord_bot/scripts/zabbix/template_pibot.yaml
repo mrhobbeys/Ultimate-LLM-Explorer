@@ -1,0 +1,90 @@
+zabbix_export:
+  version: '6.0'
+  template_groups:
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates/Applications
+  templates:
+    - uuid: a1b2c3d4e5f60718293a4b5c6d7e8f90
+      template: 'Pi Discord Bot'
+      name: 'Pi Discord Bot'
+      description: 'Health + moderation metrics for the Pi Discord Bot, read from its status file via UserParameters.'
+      groups:
+        - name: Templates/Applications
+      items:
+        - uuid: 0001c3d4e5f60718293a4b5c6d7e0001
+          name: 'CPU temperature'
+          key: 'pibot.metric[cpu_temp_c]'
+          delay: 30s
+          value_type: FLOAT
+          units: '°C'
+          description: 'SoC temperature. Watch it climb under load.'
+        - uuid: 0002c3d4e5f60718293a4b5c6d7e0002
+          name: 'Event-loop lag'
+          key: 'pibot.metric[loop_lag_ms]'
+          delay: 30s
+          value_type: FLOAT
+          units: ms
+          description: 'asyncio scheduling lag. The earliest sign the bot is falling behind.'
+        - uuid: 0003c3d4e5f60718293a4b5c6d7e0003
+          name: 'Memory used'
+          key: 'pibot.metric[mem_used_pct]'
+          delay: 60s
+          value_type: FLOAT
+          units: '%'
+        - uuid: 0004c3d4e5f60718293a4b5c6d7e0004
+          name: 'Gateway latency'
+          key: 'pibot.metric[latency_ms]'
+          delay: 60s
+          value_type: FLOAT
+          units: ms
+        - uuid: 0005c3d4e5f60718293a4b5c6d7e0005
+          name: 'Moderation actions (total)'
+          key: 'pibot.metric[mod_actions]'
+          delay: 60s
+          value_type: UNSIGNED
+        - uuid: 0006c3d4e5f60718293a4b5c6d7e0006
+          name: 'Spam trips (total)'
+          key: 'pibot.metric[spam_trips]'
+          delay: 60s
+          value_type: UNSIGNED
+        - uuid: 0007c3d4e5f60718293a4b5c6d7e0007
+          name: 'LLM escalations (total)'
+          key: 'pibot.metric[escalations]'
+          delay: 60s
+          value_type: UNSIGNED
+        - uuid: 0008c3d4e5f60718293a4b5c6d7e0008
+          name: 'LLM breaker open'
+          key: 'pibot.metric[llm_breaker_open]'
+          delay: 30s
+          value_type: UNSIGNED
+          description: '1 = the LLM circuit breaker is open (endpoint unreachable).'
+        - uuid: 0009c3d4e5f60718293a4b5c6d7e0009
+          name: 'Guilds'
+          key: 'pibot.metric[guilds]'
+          delay: 300s
+          value_type: UNSIGNED
+        - uuid: 000ac3d4e5f60718293a4b5c6d7e000a
+          name: 'Messages seen (total)'
+          key: 'pibot.metric[messages_seen]'
+          delay: 60s
+          value_type: UNSIGNED
+      triggers:
+        - uuid: 1001c3d4e5f60718293a4b5c6d7e1001
+          expression: 'last(/Pi Discord Bot/pibot.metric[cpu_temp_c])>80'
+          name: 'Pi CPU temperature high (>80C) on {HOST.NAME}'
+          priority: HIGH
+          description: 'At/above thermal-throttle territory. It is melting.'
+        - uuid: 1002c3d4e5f60718293a4b5c6d7e1002
+          expression: 'last(/Pi Discord Bot/pibot.metric[loop_lag_ms])>250'
+          name: 'Bot event-loop lag high (>250ms) on {HOST.NAME}'
+          priority: WARNING
+          description: 'The bot is struggling to keep up with events.'
+        - uuid: 1003c3d4e5f60718293a4b5c6d7e1003
+          expression: 'last(/Pi Discord Bot/pibot.metric[mem_used_pct])>92'
+          name: 'Memory nearly exhausted (>92%) on {HOST.NAME}'
+          priority: HIGH
+        - uuid: 1004c3d4e5f60718293a4b5c6d7e1004
+          expression: 'last(/Pi Discord Bot/pibot.metric[llm_breaker_open])=1'
+          name: 'LLM endpoint unreachable (breaker open) on {HOST.NAME}'
+          priority: WARNING
+          description: 'Moderation escalation is degraded — deterministic checks still run.'

@@ -1,0 +1,5 @@
+# Optional extras — heavier. Recommended only on a Pi 2 or better.
+# Enable with BOT_ENABLE_NLTK=true (and run: python -m nltk.downloader vader_lexicon punkt).
+# On a Pi 1 / Zero this will compile from source and use noticeable RAM — the
+# bot runs fine WITHOUT it (pure-regex heuristics take over automatically).
+nltk>=3.8

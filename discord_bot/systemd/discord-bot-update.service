@@ -1,0 +1,9 @@
+[Unit]
+Description=Pi Discord Bot self-update (git pull + deps + restart)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# runs as root so it can restart the service and install deps
+ExecStart=/bin/bash @APP_DIR@/scripts/update.sh --from-timer

@@ -1,0 +1,9 @@
+[Unit]
+Description=Pi Discord Bot database backup
+
+[Service]
+Type=oneshot
+User=@USER@
+WorkingDirectory=@APP_DIR@
+EnvironmentFile=@APP_DIR@/.env
+ExecStart=@APP_DIR@/.venv/bin/python -m bot.backup

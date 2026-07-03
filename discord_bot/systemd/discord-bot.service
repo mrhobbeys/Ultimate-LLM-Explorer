@@ -1,0 +1,29 @@
+[Unit]
+Description=Pi Discord Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@APP_DIR@
+EnvironmentFile=@APP_DIR@/.env
+ExecStart=@APP_DIR@/.venv/bin/python -m bot
+Restart=always
+RestartSec=5
+# uptime is the product: cap restart storms but always come back
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+# --- light sandboxing (safe on a Pi) ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelTunables=true
+# allow writes only to the app's data dir (adjust if you moved data to USB)
+ReadWritePaths=@APP_DIR@/data
+
+[Install]
+WantedBy=multi-user.target
