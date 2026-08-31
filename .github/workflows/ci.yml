@@ -1,0 +1,55 @@
+# Runs unchanged on BOTH GitHub Actions and Gitea Actions (nearly the same
+# syntax; Gitea's act_runner reads .github/workflows/ when no .gitea/ dir
+# exists). See discord_bot/docs/GITEA_MIGRATION.md for runner setup notes.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.9 = Pi OS Legacy (Bullseye), 3.11 = Pi OS Bookworm, 3.12 = current
+        python: ["3.9", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install dependencies
+        working-directory: discord_bot
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+
+      - name: Byte-compile everything (catches syntax/import-level breakage)
+        working-directory: discord_bot
+        run: python -m compileall -q bot scripts tests
+
+      - name: Run tests
+        working-directory: discord_bot
+        run: python -m pytest tests -q
+
+  # Cheap fallback lane for self-hosted runners that can't (or shouldn't)
+  # download toolchains — uses whatever python3 the runner host has.
+  # Enable by registering a runner with the label `system-python`.
+  test-system-python:
+    if: ${{ contains(github.event_name, 'workflow_dispatch') }}
+    runs-on: system-python
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install and test with system Python
+        working-directory: discord_bot
+        run: |
+          python3 -m venv .ci-venv
+          .ci-venv/bin/pip install -r requirements.txt pytest
+          .ci-venv/bin/python -m compileall -q bot scripts tests
+          .ci-venv/bin/python -m pytest tests -q
